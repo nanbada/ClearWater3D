@@ -42,6 +42,19 @@ export default function App() {
     simRef.current.cam.vp = 0;
   }, []);
 
+  const handleSetGardenViewpoint = useCallback(
+    (preset: 'deck' | 'pond' | 'stepping' | 'pine' | 'lantern' | 'bamboo') => {
+      if (!simRef.current) return;
+      simRef.current.setGardenViewpoint(preset);
+    },
+    []
+  );
+
+  const handleMoveCamera = useCallback((fwd: number, strafe: number, elev: number) => {
+    if (!simRef.current) return;
+    simRef.current.moveCameraLocal(fwd, strafe, elev);
+  }, []);
+
   return (
     <main className="relative w-screen h-screen overflow-hidden bg-black select-none">
       {/* 3D WebGL2 Water Canvas */}
@@ -61,6 +74,8 @@ export default function App() {
         stats={stats}
         onSnapshot={handleSnapshot}
         onResetCamera={handleResetCamera}
+        onSetGardenViewpoint={handleSetGardenViewpoint}
+        onMoveCamera={handleMoveCamera}
       />
     </main>
   );

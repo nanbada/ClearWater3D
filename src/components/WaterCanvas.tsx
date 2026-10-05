@@ -49,6 +49,9 @@ export const WaterCanvas: React.FC<WaterCanvasProps> = ({
     if (simRef.current) {
       const prevWaveScale = simRef.current.config.waveScale;
       const prevWindSpeed = simRef.current.config.windSpeed ?? 6.0;
+      const prevSeed = simRef.current.config.vegetationSeed;
+      const prevDensity = simRef.current.config.vegetationDensity;
+      const prevBloom = simRef.current.config.lotusFlowerBloomRate;
       simRef.current.config = { ...config };
 
       // If waveScale or windSpeed changed, regenerate wave spectrum
@@ -57,6 +60,19 @@ export const WaterCanvas: React.FC<WaterCanvasProps> = ({
         Math.abs(prevWindSpeed - (config.windSpeed ?? 6.0)) > 0.05
       ) {
         simRef.current.updateWaveSpectrum(config.waveScale, config.windSpeed ?? 6.0);
+      }
+
+      // If procedural vegetation seed, density, or bloom changed, regenerate ecosystem
+      if (
+        prevSeed !== config.vegetationSeed ||
+        prevDensity !== config.vegetationDensity ||
+        prevBloom !== config.lotusFlowerBloomRate
+      ) {
+        simRef.current.regenerateVegetation(
+          config.vegetationSeed,
+          config.vegetationDensity,
+          config.lotusFlowerBloomRate
+        );
       }
     }
 
@@ -76,6 +92,62 @@ export const WaterCanvas: React.FC<WaterCanvasProps> = ({
       waterAudio.setMuted(!config.soundEnabled);
     }
   }, [config]);
+
+  // Keyboard navigation loop for smooth 3D garden & pond strolling
+  useEffect(() => {
+    const keysDown = new Set<string>();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept if typing in input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      keysDown.add(e.code);
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      keysDown.delete(e.code);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    let rafId: number;
+    let lastTick = performance.now();
+
+    const loop = (now: number) => {
+      const dt = Math.min(0.1, (now - lastTick) / 1000);
+      lastTick = now;
+
+      if (simRef.current && keysDown.size > 0) {
+        const isShift = keysDown.has('ShiftLeft') || keysDown.has('ShiftRight');
+        const speed = (isShift ? 3.5 : 1.8) * dt;
+
+        let fwd = 0;
+        let strafe = 0;
+        let elev = 0;
+
+        if (keysDown.has('KeyW') || keysDown.has('ArrowUp')) fwd += 1;
+        if (keysDown.has('KeyS') || keysDown.has('ArrowDown')) fwd -= 1;
+        if (keysDown.has('KeyD') || keysDown.has('ArrowRight')) strafe += 1;
+        if (keysDown.has('KeyA') || keysDown.has('ArrowLeft')) strafe -= 1;
+        if (keysDown.has('KeyQ') || keysDown.has('PageDown')) elev -= 1;
+        if (keysDown.has('KeyE') || keysDown.has('Space') || keysDown.has('PageUp')) elev += 1;
+
+        if (fwd !== 0 || strafe !== 0 || elev !== 0) {
+          simRef.current.moveCameraLocal(fwd * speed, strafe * speed, elev * speed * 0.7);
+        }
+      }
+
+      rafId = requestAnimationFrame(loop);
+    };
+
+    rafId = requestAnimationFrame(loop);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      cancelAnimationFrame(rafId);
+    };
+  }, [simRef]);
 
   // Pointer event handlers
   const handlePointerDown = useCallback(
